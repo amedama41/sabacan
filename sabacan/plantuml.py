@@ -13,7 +13,7 @@ TO_CHARS   = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_?'
 ENCODE_TABLE = dict(zip(FROM_CHARS, TO_CHARS))
 DECODE_TABLE = dict(zip(TO_CHARS, FROM_CHARS))
 
-DEFAULT_SERVER_URL = 'http://%s:%d/plantuml' % ('192.168.56.102', 8080)
+DEFAULT_SERVER_URL = 'http://%s:%d/plantuml' % ('127.0.0.1', 8080)
 
 FORMAT_LIST = [
     'png', 'braille',
@@ -64,8 +64,8 @@ class FlagAction(argparse.Action):
                                          help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        base_url = getattr(namespace, 'server_url', DEFAULT_SERVER_URL)
-        timeout = getattr(namespace, 'server_timeout', None)
+        base_url = getattr(args, 'server_url', None) or DEFAULT_SERVER_URL
+        timeout = getattr(parser, 'server_timeout', None)
         code = '@startuml\n' + self.dest + '\n@enduml'
         try:
             result = compile(base_url, code, 'txt', timeout=timeout)
@@ -86,8 +86,8 @@ class LanguageAction(argparse.Action):
                 default, type, choices, required, help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        base_url = getattr(namespace, 'server_url', DEFAULT_SERVER_URL)
-        timeout = getattr(namespace, 'server_timeout', None)
+        base_url = getattr(args, 'server_url', None) or DEFAULT_SERVER_URL
+        timeout = getattr(parser, 'server_timeout', None)
         url = base_url + '/language'
         try:
             with urllib.request.urlopen(url, timeout=timeout) as response:
@@ -98,9 +98,9 @@ class LanguageAction(argparse.Action):
         parser.exit(0)
 
 
-def make_parser():
-    parser = argparse.ArgumentParser(
-            prog='plantuml',
+def make_parser(parser_constructor=argparse.ArgumentParser):
+    parser = parser_constructor(
+            'plantuml',
             usage='%(prog)s [options] [file/dir] [file/dir] [file/dir]',
             description='CLI for PlantUML server',
             add_help=False)
@@ -412,6 +412,7 @@ def make_parser():
             'file/dir',
             help='UML files',
             nargs='*')
+    parser.set_defaults(main_function=main)
     return parser
 
 
@@ -574,7 +575,7 @@ def _run_with_pipe(base_url, timeout, args):
 
 
 def main(args):
-    base_url = getattr(args, 'server_url', DEFAULT_SERVER_URL)
+    base_url = getattr(args, 'server_url', None) or DEFAULT_SERVER_URL
     timeout = getattr(args, 'server_timeout', None)
 
     if args.pipe:
@@ -616,5 +617,5 @@ def main(args):
 if __name__ == '__main__':
     parser = make_parser()
     args = parser.parse_args()
-    main(args)
+    args.main_function(args)
 

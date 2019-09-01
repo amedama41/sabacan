@@ -16,9 +16,9 @@ except ImportError:
     from xml.etree import ElementTree as ET
 
 
-SERVER_HOST = '192.168.56.102'
+SERVER_HOST = '127.0.0.1'
 SERVER_PORT = 8080
-BASE_URL = 'http://%s:%d' % (SERVER_HOST, SERVER_PORT)
+DEFAULT_SERVER_URL = 'http://%s:%d' % (SERVER_HOST, SERVER_PORT)
 PARSER_EXTENSIONS_LIST = [
         ('markdown', ['md', 'markdown']),
         ('plain', ['txt']),
@@ -33,9 +33,9 @@ FORMAT_LIST = ['json', 'json2', 'plain', 'plain2', 'xml']
 UNSUPPORTED_OPTIONS = ['lang', 'threshold']
 
 
-def make_parser():
-    parser = argparse.ArgumentParser(
-            prog='redpen',
+def make_parser(parser_constructor=argparse.ArgumentParser):
+    parser = parser_constructor(
+            'redpen',
             usage='%(prog)s [Options] [<INPUT FILE>]',
             description='CLI for RedPen server',
             add_help=False)
@@ -97,6 +97,7 @@ def make_parser():
             help='Input document',
             nargs='?',
             metavar='<INPUT FILE>')
+    parser.set_defaults(main_function=main)
     return parser
 
 
@@ -150,23 +151,24 @@ def get_number_of_errors(result, format):
         return len(root.findall('error'))
 
 
-def get_version(base_url):
+def get_version(base_url, timeout=None):
     url = base_url + '/rest/config/redpens'
-    with urllib.request.urlopen(url) as response:
+    with urllib.request.urlopen(url, timeout=timeout) as response:
         result = json.loads(response.read().decode('utf8'))
         return result['version']
 
 
-def get_langauge(base_url, document):
+def get_langauge(base_url, document, timeout=None):
     url = base_url + '/rest/document/language'
     data = {'document': document}
     data = urllib.parse.urlencode(data).encode('utf8')
-    with urllib.request.urlopen(url, data) as response:
+    with urllib.request.urlopen(url, data, timeout=timeout) as response:
         result = json.loads(response.read().decode('utf8'))
         return result['key']
 
 
-def validate(base_url, document, document_parser, lang, format, config=None):
+def validate(base_url, document, document_parser, lang, format,
+             config=None, timeout=None):
     data = {
         'document': document,
         'documentParser': document_parser,
@@ -178,7 +180,7 @@ def validate(base_url, document, document_parser, lang, format, config=None):
 
     url = base_url + '/rest/document/validate'
     data = urllib.parse.urlencode(data).encode('utf8')
-    with urllib.request.urlopen(url, data) as response:
+    with urllib.request.urlopen(url, data, timeout=timeout) as response:
         result = response.read().decode('utf8')
         if format.startswith('json'):
             return '[%s]' % result
@@ -224,13 +226,13 @@ def _get_document(args):
     return input_file.read_text()
 
 
-def main(base_url):
-    logging.debug('Parsing command line options...')
-    args = make_parser().parse_args()
+def main(args):
+    base_url = getattr(args, 'server_url', None) or DEFAULT_SERVER_URL
+    timeout = getattr(args, 'server_timeout', None)
 
     if args.version:
         logging.debug('Getting RedPen version...')
-        print(get_version(base_url))
+        print(get_version(base_url, timeout=timeout))
         sys.exit(0)
 
     for option in UNSUPPORTED_OPTIONS:
@@ -249,14 +251,15 @@ def main(base_url):
         lang = root.attrib.get('lang', 'en')
     else:
         logging.debug('Getting language from input document...')
-        lang = get_langauge(base_url, document)
+        lang = get_langauge(base_url, document, timeout=timeout)
 
     logging.debug('Validating input document '
                   '(document_parser=%s, lang=%s, format=%s)...',
                   document_parser, lang, args.format)
     try:
         result = validate(base_url,
-                          document, document_parser, lang, args.format, config)
+                          document, document_parser, lang, args.format,
+                          config=config, timeout=timeout)
     except urllib.error.HTTPError as error:
         with error:
             _exit_by_error('Failed to validate input document (%d %s): %s',
@@ -274,4 +277,6 @@ def main(base_url):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    main(BASE_URL)
+    logging.debug('Parsing command line options...')
+    args = make_parser().parse_args()
+    args.main_function(args)

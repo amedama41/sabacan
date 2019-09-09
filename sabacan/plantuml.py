@@ -456,7 +456,7 @@ def decode_code(encoded_uml):
     base64_code = ''.join(_DECODE_TABLE[c] for c in encoded_uml)
     compressed_code = base64.b64decode(base64_code)
     wbits = 15 if compressed_code[0:2] == b'\x78\x9c' else -15
-    byte_code = zlib.decompress(compressed_code, wbits=wbits)
+    byte_code = zlib.decompress(compressed_code, wbits)
     return byte_code.decode('utf-8')
 
 

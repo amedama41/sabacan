@@ -12,7 +12,9 @@ This module may use the following environment variables.
 """
 import argparse
 import base64
+import glob
 import logging
+import os
 import pathlib
 import sys
 import urllib.error
@@ -560,21 +562,23 @@ def _decodeurl(encoded_uml):
     return True
 
 def _for_each_file(paths, proc, do_exit=False):
-    base = pathlib.Path('.')
     result = True
     for path in paths:
-        pathlist = base.glob(path)
-        if not pathlist:
-            logging.warning('%s is invalid path', path)
-            continue
-        for filepath in pathlist:
+        path = os.path.expandvars(os.path.expanduser(path))
+        do_process = False
+        for filepath in glob.iglob(path, recursive=True):
+            filepath = pathlib.Path(filepath)
             if not filepath.is_file():
                 continue
+            do_process = True
             try:
                 result = proc(filepath) and result
             except Exception: # pylint: disable=broad-except
                 logging.exception('%s: Failed to process', filepath)
                 result = False
+        if not do_process:
+            logging.warning('%s is invalid path', path)
+            continue
     if do_exit:
         sys.exit(0 if result else 1)
     return result

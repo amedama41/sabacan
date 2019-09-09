@@ -1,7 +1,9 @@
 """This module provides utility function to sabacan.
 """
 import argparse
+import logging
 import os
+
 
 class SetEnvAction(argparse.Action): # pylint: disable=too-few-public-methods
     """Custom argparse.Action which set environment variable.
@@ -43,3 +45,39 @@ def get_timeout(servername, default=None):
         except ValueError:
             pass
     return None
+
+
+class NotSupportedAction(argparse.Action):
+    """Custom argparse.Action class for not supported options.
+
+    The help message for an option attached to this class is appended
+    'NOT SUPPORTED' to.
+    When the options are used, waning messages are displayed automatically.
+    """
+    # pylint: disable=too-few-public-methods
+    def __init__(self, option_strings, dest, nargs=None, const=None,
+                 default=None, type=None, choices=None, required=False,
+                 help=None, metavar=None):
+        # pylint: disable=too-many-arguments,redefined-builtin
+        help = 'NOT SUPPORTED' if help is None else help + ' (NOT SUPPORTED)'
+        super(NotSupportedAction, self).__init__(
+            option_strings, dest, nargs, const,
+            default, type, choices, required, help, metavar)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        logging.warning('"%s" is not supported', option_string)
+
+
+class NotSupportedFlagAction(NotSupportedAction):
+    """Custom argparse.Action class for not supported options.
+
+    The class is same as NotSupportedAction except nargs is always 0.
+    """
+    # pylint: disable=too-few-public-methods
+    def __init__(self, option_strings, dest, nargs=None, const=None,
+                 default=None, type=None, choices=None, required=False,
+                 help=None, metavar=None):
+        # pylint: disable=too-many-arguments,redefined-builtin
+        super(NotSupportedFlagAction, self).__init__(
+            option_strings, dest, 0, const,
+            default, type, choices, required, help, metavar)

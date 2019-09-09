@@ -26,6 +26,7 @@ except ImportError:
     from xml.etree import ElementTree as ET
 
 import sabacan.utils
+from sabacan.utils import NotSupportedAction
 
 
 _SERVER_HOST = '127.0.0.1'
@@ -42,7 +43,6 @@ _PARSER_EXTENSIONS_LIST = [
         ('properties', ['properties']),
 ]
 _FORMAT_LIST = ['json', 'json2', 'plain', 'plain2', 'xml']
-_UNSUPPORTED_OPTIONS = ['lang', 'threshold']
 
 
 def make_parser(parser_constructor=argparse.ArgumentParser):
@@ -78,8 +78,8 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
         default=1)
     parser.add_argument(
         '--lang', '-L',
-        help='Language of error messages (%(choices)s) (NOT SUPPORTED)',
-        action='store',
+        help='Language of error messages (%(choices)s)',
+        action=NotSupportedAction,
         choices=['en', 'ja'],
         metavar='<LANGUAGE>')
     parser.add_argument(
@@ -98,8 +98,8 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
         dest='document')
     parser.add_argument(
         '--threshold', '-t',
-        help='Threshold of error level (info, warn, error) (NOT SUPPORTED)',
-        action='store',
+        help='Threshold of error level (info, warn, error)',
+        action=NotSupportedAction,
         choices=['info', 'warn', 'error'],
         metavar='<THRESHOLD>')
     parser.add_argument(
@@ -310,10 +310,6 @@ def main(args):
         logging.debug('Getting RedPen version...')
         print(get_version(base_url, timeout=timeout))
         sys.exit(0)
-
-    for option in _UNSUPPORTED_OPTIONS:
-        if getattr(args, option) is not None:
-            logging.warning('Option "%s" is not supported', option)
 
     logging.debug('Getting configuration file...')
     config = _get_config(args)

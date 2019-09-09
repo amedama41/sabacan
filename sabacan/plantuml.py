@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""This module provides functions to access PlantUML server.
+"""
 import argparse
 import base64
 import logging
@@ -8,14 +10,12 @@ import urllib.error
 import urllib.request
 import zlib
 
-FROM_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
-TO_CHARS   = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_?'
-ENCODE_TABLE = dict(zip(FROM_CHARS, TO_CHARS))
-DECODE_TABLE = dict(zip(TO_CHARS, FROM_CHARS))
+_FROM_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
+_TO_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_?'
+_ENCODE_TABLE = dict(zip(_FROM_CHARS, _TO_CHARS))
+_DECODE_TABLE = dict(zip(_TO_CHARS, _FROM_CHARS))
 
-DEFAULT_SERVER_URL = 'http://%s:%d/plantuml' % ('127.0.0.1', 8080)
-
-FORMAT_LIST = [
+_FORMAT_LIST = [
     'png', 'braille',
     'svg', 'svg:nornd',
     'eps', 'eps:text',
@@ -26,39 +26,60 @@ FORMAT_LIST = [
     'latex', 'latex:nopreamble'
     'base64',
 ]
-
-FORMAT_TO_URL_PATTERN_TABLE = {
+_FORMAT_TO_URL_PATTERN_TABLE = {
     'eps:text': 'epstext',
     'utxt': 'txt',
 }
 
+DEFAULT_SERVER_URL = 'http://%s:%d/plantuml' % ('127.0.0.1', 8080)
+
 
 class NotSupportedAction(argparse.Action):
+    """Custom argparse.Action class for not supported options.
+
+    The help message for an option attached to this class is appended
+    'NOT SUPPORTED' to.
+    When the options are used, waning messages are displayed automatically.
+    """
+    # pylint: disable=too-few-public-methods
     def __init__(self, option_strings, dest, nargs=None, const=None,
                  default=None, type=None, choices=None, required=False,
                  help=None, metavar=None):
+        # pylint: disable=too-many-arguments,redefined-builtin
         help = 'NOT SUPPORTED' if help is None else help + ' (NOT SUPPORTED)'
         super(NotSupportedAction, self).__init__(
-                option_strings, dest, nargs, const,
-                default, type, choices, required, help, metavar)
+            option_strings, dest, nargs, const,
+            default, type, choices, required, help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
         logging.warning('"%s" is not supported', option_string)
 
 
 class NotSupportedFlagAction(NotSupportedAction):
+    """Custom argparse.Action class for not supported options.
+
+    The class is same as NotSupportedAction except nargs is always 0.
+    """
+    # pylint: disable=too-few-public-methods
     def __init__(self, option_strings, dest, nargs=None, const=None,
                  default=None, type=None, choices=None, required=False,
                  help=None, metavar=None):
+        # pylint: disable=too-many-arguments,redefined-builtin
         super(NotSupportedFlagAction, self).__init__(
-                option_strings, dest, 0, const,
-                default, type, choices, required, help, metavar)
+            option_strings, dest, 0, const,
+            default, type, choices, required, help, metavar)
 
 
 class FlagAction(argparse.Action):
+    """Custom argparse.Action class to display variable information.
+
+    This class compile dest as PlantUML code when the action is invoked.
+    """
+    # pylint: disable=too-few-public-methods
     def __init__(self, option_strings, dest, nargs=None, const=None,
                  default=None, type=None, choices=None, required=False,
                  help=None, metavar=None):
+        # pylint: disable=too-many-arguments,redefined-builtin
         super(FlagAction, self).__init__(option_strings, dest, 0, const,
                                          default, type, choices, required,
                                          help, metavar)
@@ -68,22 +89,26 @@ class FlagAction(argparse.Action):
         timeout = getattr(parser, 'server_timeout', None)
         code = '@startuml\n' + self.dest + '\n@enduml'
         try:
-            result = compile(base_url, code, 'txt', timeout=timeout)
+            result = compile_code(base_url, code, 'txt', timeout=timeout)
             lines = result.decode('utf-8').splitlines()
             print('\n'.join(line.strip() for line in lines))
-        except Exception as ex:
+        except Exception as ex: # pylint: disable=broad-except
             logging.error('Failed to display %s: %s', self.dest, ex)
             parser.exit(1)
         parser.exit(0)
 
 
 class LanguageAction(argparse.Action):
+    """Custom argparse.Action class to display PlantUML language information.
+    """
+    # pylint: disable=too-few-public-methods
     def __init__(self, option_strings, dest, nargs=None, const=None,
                  default=None, type=None, choices=None, required=False,
                  help=None, metavar=None):
+        # pylint: disable=too-many-arguments,redefined-builtin
         super(LanguageAction, self).__init__(
-                option_strings, dest, 0, const,
-                default, type, choices, required, help, metavar)
+            option_strings, dest, 0, const,
+            default, type, choices, required, help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
         base_url = getattr(parser, 'server_url', None) or DEFAULT_SERVER_URL
@@ -92,353 +117,385 @@ class LanguageAction(argparse.Action):
         try:
             with urllib.request.urlopen(url, timeout=timeout) as response:
                 print(response.read().decode('utf8'))
-        except Exception as ex:
+        except Exception as ex: # pylint: disable=broad-except
             logging.error('Failed to display language: %s', ex)
             parser.exit(1)
         parser.exit(0)
 
 
 def make_parser(parser_constructor=argparse.ArgumentParser):
+    """Make argparse parser object for PlantUML server.
+    """
+    # pylint: disable=too-many-statements
     parser = parser_constructor(
-            'plantuml',
-            usage='%(prog)s [options] [file/dir] [file/dir] [file/dir]',
-            description='CLI for PlantUML server',
-            add_help=False)
+        'plantuml',
+        usage='%(prog)s [options] [file/dir] [file/dir] [file/dir]',
+        description='CLI for PlantUML server',
+        add_help=False)
     parser.add_argument(
-            '-gui',
-            help='To run the graphical user interface',
-            action=NotSupportedFlagAction)
+        '-gui',
+        help='To run the graphical user interface',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-t',
-            help='To generate images using specified format (default is PNG)',
-            action='store',
-            choices=FORMAT_LIST,
-            default='png',
-            metavar='format',
-            dest='format')
+        '-t',
+        help='To generate images using specified format (default is PNG)',
+        action='store',
+        choices=_FORMAT_LIST,
+        default='png',
+        metavar='format',
+        dest='format')
     parser.add_argument(
-            '-output', '-o',
-            help='To generate images in the specified directory',
-            action='store',
-            metavar='"dir"',
-            dest='outdir')
+        '-output', '-o',
+        help='To generate images in the specified directory',
+        action='store',
+        metavar='"dir"',
+        dest='outdir')
     parser.add_argument(
-            '-ofile',
-            help='To generate an image with the specified filename',
-            action='store',
-            metavar='"file"',
-            dest='outfile')
+        '-ofile',
+        help='To generate an image with the specified filename',
+        action='store',
+        metavar='"file"',
+        dest='outfile')
     parser.add_argument(
-            '-D',
-            action='store',
-            metavar='VAR1=value',
-            help=('Not support currently. '
-                  'To set a preprocessing variable '
-                  'as if \'!define VAR1 value\' were used'))
+        '-D',
+        action='store',
+        metavar='VAR1=value',
+        help=('Not support currently. '
+              'To set a preprocessing variable '
+              'as if \'!define VAR1 value\' were used'))
     parser.add_argument(
-            '-S',
-            help=('Not support currently. '
-                  'To set a skin parameter '
-                  'as if \'skinparam param1 value\' were used'),
-            action='store',
-            metavar='param1=value')
+        '-S',
+        help=('Not support currently. '
+              'To set a skin parameter '
+              'as if \'skinparam param1 value\' were used'),
+        action='store',
+        metavar='param1=value')
     parser.add_argument(
-            '-recurse', '-r',
-            help='recurse through directories',
-            action='store_true')
+        '-recurse', '-r',
+        help='recurse through directories',
+        action='store_true')
     parser.add_argument(
-            '-config', '-c',
-            help=('Not support currently. '
-                  'To read the provided config file before each diagram'),
-            metavar='"file"',
-            action='store')
+        '-config', '-c',
+        help=('Not support currently. '
+              'To read the provided config file before each diagram'),
+        metavar='"file"',
+        action='store')
     parser.add_argument(
-            '-I',
-            help=('Not support currently. '
-                  'To include file '
-                  'as if \'!include file\' were used'),
-            action='store',
-            metavar='/path/to/file')
+        '-I',
+        help=('Not support currently. '
+              'To include file as if \'!include file\' were used'),
+        action='store',
+        metavar='/path/to/file')
     parser.add_argument(
-            '-charset',
-            help=('Not support currently. '
-                  'To use a specific charset (default is US-ASCII)'),
-            action='store',
-            metavar='xxx')
+        '-charset',
+        help=('Not support currently. '
+              'To use a specific charset (default is US-ASCII)'),
+        action='store',
+        metavar='xxx')
     parser.add_argument(
-            '-exclude', '-x',
-            help=('Not support currently. '
-                  'To exclude files that match the provided pattern'),
-            action='store',
-            metavar='pattern')
+        '-exclude', '-x',
+        help=('Not support currently. '
+              'To exclude files that match the provided pattern'),
+        action='store',
+        metavar='pattern')
     parser.add_argument(
-            '-metadata',
-            help='To retrieve PlantUML sources from PNG images',
-            action='store_true')
+        '-metadata',
+        help='To retrieve PlantUML sources from PNG images',
+        action='store_true')
     parser.add_argument(
-            '-nometadata',
-            help='To NOT export metadata in PNG/SVG generated files',
-            action='store_true')
+        '-nometadata',
+        help='To NOT export metadata in PNG/SVG generated files',
+        action='store_true')
     parser.add_argument(
-            '-checkmetadata',
-            help='Skip PNG files that don\'t need to be regenerated',
-            action='store_true')
+        '-checkmetadata',
+        help='Skip PNG files that don\'t need to be regenerated',
+        action='store_true')
     parser.add_argument(
-            '-logdata',
-            help='TODO',
-            action='store',
-            metavar='"file"')
+        '-logdata',
+        help='TODO',
+        action='store',
+        metavar='"file"')
     parser.add_argument(
-            '-word',
-            help='TODO',
-            action='store_true')
+        '-word',
+        help='TODO',
+        action='store_true')
     parser.add_argument(
-            '-version',
-            help='To display information about PlantUML and Java versions',
-            action=FlagAction)
+        '-version',
+        help='To display information about PlantUML and Java versions',
+        action=FlagAction)
     parser.add_argument(
-            '-license',
-            help='To display license',
-            action=FlagAction)
+        '-license',
+        help='To display license',
+        action=FlagAction)
     parser.add_argument(
-            '-checkversion',
-            help='To check if a newer version is available for download',
-            action=FlagAction)
+        '-checkversion',
+        help='To check if a newer version is available for download',
+        action=FlagAction)
     parser.add_argument(
-            '-verbose', '-v',
-            help='To have log information',
-            action=NotSupportedFlagAction)
+        '-verbose', '-v',
+        help='To have log information',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-quiet',
-            help=('Not support currently. '
-                  'To NOT print error message into the console'),
-            action='store_true')
+        '-quiet',
+        help=('Not support currently. '
+              'To NOT print error message into the console'),
+        action='store_true')
     parser.add_argument(
-            '-debugsvek', '-debug_svek',
-            help='To generate intermediate svek files',
-            action=NotSupportedFlagAction)
+        '-debugsvek', '-debug_svek',
+        help='To generate intermediate svek files',
+        action=NotSupportedFlagAction)
     # parser.add_argument(
-    #         '-keepfiles',
-    #         help='NOT delete temporary files after process.',
-    #         action=NotSupportedFlagAction)
+    #     '-keepfiles',
+    #     help='NOT delete temporary files after process.',
+    #     action=NotSupportedFlagAction)
     parser.add_argument(
-            '-help', '-h', '-?',
-            help='To display this help message',
-            action='help')
+        '-help', '-h', '-?',
+        help='To display this help message',
+        action='help')
     parser.add_argument(
-            '-testdot',
-            help='To test the installation of graphviz',
-            action=FlagAction)
+        '-testdot',
+        help='To test the installation of graphviz',
+        action=FlagAction)
     parser.add_argument(
-            '-graphvizdot', '-graphviz_dot',
-            help='To specify dot executable',
-            action=NotSupportedAction,
-            metavar='"exe"')
+        '-graphvizdot', '-graphviz_dot',
+        help='To specify dot executable',
+        action=NotSupportedAction,
+        metavar='"exe"')
     parser.add_argument(
-            '-pipe', '-p',
-            help=('To use stdin for PlantUML source '
-                  'and stdout for PNG/SVG/EPS generation'),
-            action='store_true')
+        '-pipe', '-p',
+        help=('To use stdin for PlantUML source '
+              'and stdout for PNG/SVG/EPS generation'),
+        action='store_true')
     parser.add_argument(
-            '-encodesprite',
-            help=('To encode a sprite at gray level (z for compression) '
-                  'from an image'),
-            action=NotSupportedAction,
-            choices=['4', '8', '16', '4z', '8z', '16z'])
+        '-encodesprite',
+        help=('To encode a sprite at gray level (z for compression) '
+              'from an image'),
+        action=NotSupportedAction,
+        choices=['4', '8', '16', '4z', '8z', '16z'])
     parser.add_argument(
-            '-computeurl', '-encodeurl',
-            help='To compute the encoded URL of a PlantUML source file',
-            action='store_true')
+        '-computeurl', '-encodeurl',
+        help='To compute the encoded URL of a PlantUML source file',
+        action='store_true')
     parser.add_argument(
-            '-decodeurl',
-            help='To retrieve the PlantUML source from an encoded URL',
-            action='store_true')
+        '-decodeurl',
+        help='To retrieve the PlantUML source from an encoded URL',
+        action='store_true')
     parser.add_argument(
-            '-syntax',
-            help=('To report any syntax error '
-                  'from standard input without generating images'),
-            action='store_true')
+        '-syntax',
+        help=('To report any syntax error '
+              'from standard input without generating images'),
+        action='store_true')
     parser.add_argument(
-            '-language',
-            help='To print the list of PlantUML keywords',
-            action=LanguageAction)
+        '-language',
+        help='To print the list of PlantUML keywords',
+        action=LanguageAction)
     # parser.add_argument(
-    #         '-nosuggestengine',
-    #         action='store_true',
-    #         help='To disable the suggest engine when errors in diagrams')
+    #     '-nosuggestengine',
+    #     action='store_true',
+    #     help='To disable the suggest engine when errors in diagrams')
     parser.add_argument(
-            '-checkonly',
-            help='To check the syntax of files without generating images',
-            action=NotSupportedFlagAction),
+        '-checkonly',
+        help='To check the syntax of files without generating images',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-failfast',
-            help=('To stop processing '
-                  'as soon as a syntax error in diagram occurs'),
-            action=NotSupportedFlagAction)
+        '-failfast',
+        help=('To stop processing '
+              'as soon as a syntax error in diagram occurs'),
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-failfast2',
-            help=('To do a first syntax check before processing files, '
-                  'to fail even faster'),
-            action=NotSupportedFlagAction)
+        '-failfast2',
+        help=('To do a first syntax check before processing files, '
+              'to fail even faster'),
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-pattern',
-            help='To print the list of Regular Expression used by PlantUML',
-            action=NotSupportedFlagAction)
+        '-pattern',
+        help='To print the list of Regular Expression used by PlantUML',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-duration',
-            help='To print the duration of complete diagrams processing',
-            action=NotSupportedFlagAction)
+        '-duration',
+        help='To print the duration of complete diagrams processing',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-nbthread',
-            help='To use (N) threads for processing',
-            action=NotSupportedAction,
-            metavar='N')
+        '-nbthread',
+        help='To use (N) threads for processing',
+        action=NotSupportedAction,
+        metavar='N')
     parser.add_argument(
-            '-timeout',
-            help=('Processing timeout in (N) seconds. '
-                  'Defaults to 15 minutes (900 seconds).'),
-            action=NotSupportedAction,
-            metavar='N')
+        '-timeout',
+        help=('Processing timeout in (N) seconds. '
+              'Defaults to 15 minutes (900 seconds).'),
+        action=NotSupportedAction,
+        metavar='N')
     parser.add_argument(
-            '-about', '-authors', '-author',
-            help='To print information about PlantUML authors',
-            action=FlagAction,
-            dest='authors')
+        '-about', '-authors', '-author',
+        help='To print information about PlantUML authors',
+        action=FlagAction,
+        dest='authors')
     parser.add_argument(
-            '-overwrite',
-            help='To allow to overwrite read only files',
-            action='store_true')
+        '-overwrite',
+        help='To allow to overwrite read only files',
+        action='store_true')
     parser.add_argument(
-            '-printfonts',
-            help='To print fonts available on your system',
-            action=FlagAction,
-            dest='help font')
+        '-printfonts',
+        help='To print fonts available on your system',
+        action=FlagAction,
+        dest='help font')
     parser.add_argument(
-            '-enablestats',
-            help='To enable statistics computation',
-            action=NotSupportedFlagAction)
+        '-enablestats',
+        help='To enable statistics computation',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-disablestats',
-            help='To disable statistics computation (default)',
-            action=NotSupportedFlagAction)
+        '-disablestats',
+        help='To disable statistics computation (default)',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-htmlstats',
-            help='To output general statistics in file plantuml-stats.html',
-            action=NotSupportedFlagAction)
+        '-htmlstats',
+        help='To output general statistics in file plantuml-stats.html',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-xmlstats',
-            help='To output general statistics in file plantuml-stats.xml',
-            action=NotSupportedFlagAction)
+        '-xmlstats',
+        help='To output general statistics in file plantuml-stats.xml',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-realtimestats',
-            help='To generate statistics on the fly rather than at the end',
-            action=NotSupportedFlagAction)
+        '-realtimestats',
+        help='To generate statistics on the fly rather than at the end',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-loopstats',
-            help='To continuously print statistics about usage',
-            action=NotSupportedFlagAction)
+        '-loopstats',
+        help='To continuously print statistics about usage',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-dumpstats',
-            help='TODO',
-            action=NotSupportedFlagAction)
+        '-dumpstats',
+        help='TODO',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-dumphtmlstats',
-            help='TODO',
-            action=NotSupportedFlagAction)
+        '-dumphtmlstats',
+        help='TODO',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-clipboard',
-            help='TODO',
-            action=NotSupportedFlagAction)
+        '-clipboard',
+        help='TODO',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-clipboardloop',
-            help='TODO',
-            action=NotSupportedFlagAction)
+        '-clipboardloop',
+        help='TODO',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-splash',
-            help='To display a splash screen with some progress bar',
-            action=NotSupportedFlagAction)
+        '-splash',
+        help='To display a splash screen with some progress bar',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-progress',
-            help='To display a textual progress bar in console',
-            action=NotSupportedFlagAction)
+        '-progress',
+        help='To display a textual progress bar in console',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-pipedelimitor',
-            help='TODO',
-            action='store')
+        '-pipedelimitor',
+        help='TODO',
+        action='store')
     parser.add_argument(
-            '-pipemap',
-            help='Not support currently. TODO',
-            action='store_true')
+        '-pipemap',
+        help='Not support currently. TODO',
+        action='store_true')
     parser.add_argument(
-            '-pipenostderr',
-            help='Not support currently. TODO',
-            action='store_true')
+        '-pipenostderr',
+        help='Not support currently. TODO',
+        action='store_true')
     parser.add_argument(
-            '-pipeimageindex',
-            help=('Not support currently. '
-                  'To generate the Nth image with pipe option'),
-            action='store',
-            metavar='N')
+        '-pipeimageindex',
+        help=('Not support currently. '
+              'To generate the Nth image with pipe option'),
+        action='store',
+        metavar='N')
     parser.add_argument(
-            '-stdlib',
-            help='To print standard library info',
-            action=FlagAction)
+        '-stdlib',
+        help='To print standard library info',
+        action=FlagAction)
     parser.add_argument(
-            '-extractstdlib',
-            help='To extract PlantUML Standard Library into stdlib folder',
-            action=NotSupportedFlagAction)
+        '-extractstdlib',
+        help='To extract PlantUML Standard Library into stdlib folder',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-stdrpt', '-stdrpt:1',
-            help='Not support currently. TODO',
-            action='store_true')
+        '-stdrpt', '-stdrpt:1',
+        help='Not support currently. TODO',
+        action='store_true')
     parser.add_argument(
-            '-useseparatorminus',
-            help='Not support currently. TODO',
-            action='store_true')
+        '-useseparatorminus',
+        help='Not support currently. TODO',
+        action='store_true')
     parser.add_argument(
-            '-filename',
-            help='Not support currently. To override %%filename%% variable',
-            action='store',
-            metavar='"example.puml"')
+        '-filename',
+        help='Not support currently. To override %%filename%% variable',
+        action='store',
+        metavar='"example.puml"')
     parser.add_argument(
-            '-preproc',
-            help='To output preprocessor text of diagrams',
-            action=NotSupportedFlagAction)
+        '-preproc',
+        help='To output preprocessor text of diagrams',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            '-cypher',
-            help='To cypher texts of diagrams so that you can share them',
-            action=NotSupportedFlagAction)
+        '-cypher',
+        help='To cypher texts of diagrams so that you can share them',
+        action=NotSupportedFlagAction)
     parser.add_argument(
-            'file/dir',
-            help='UML files',
-            nargs='*')
+        'file/dir',
+        help='UML files',
+        nargs='*')
     parser.set_defaults(main_function=main)
     return parser
 
 
 class CompileError(RuntimeError):
+    """Exception for compile error.
+    """
     def __init__(self, msg, data):
         super(CompileError, self).__init__(msg)
         self.data = data
 
 
 def encode_code(uml_code, level=-1):
+    """Encode PlantUML code by PlantUML Text Encoding
+    (http://plantuml.com/en/text-encoding).
+
+    Args:
+        uml_code (str): PlantUML code.
+        level (int): Compressing level.
+    Returns:
+        str: The PlantUML Text Encoding text.
+    """
     byte_code = uml_code.encode('utf-8')
     compressed_code = zlib.compress(byte_code, level)
     base64_code = base64.b64encode(compressed_code).decode('ascii')
-    return ''.join(ENCODE_TABLE[c] for c in base64_code)
+    return ''.join(_ENCODE_TABLE[c] for c in base64_code)
 
 
 def decode_code(encoded_uml):
-    base64_code = ''.join(DECODE_TABLE[c] for c in encoded_uml)
+    """Decode PlantUML Text Encoding text to PlantUML code.
+
+    Args:
+        encoded_uml (str): PlantUML Text Encoding text.
+    Returns:
+        str: PlantUML code.
+    """
+    base64_code = ''.join(_DECODE_TABLE[c] for c in encoded_uml)
     compressed_code = base64.b64decode(base64_code)
     wbits = 15 if compressed_code[0:2] == b'\x78\x9c' else -15
     byte_code = zlib.decompress(compressed_code, wbits=wbits)
     return byte_code.decode('utf-8')
 
 
-def compile(base_url, uml_code, output_format, use_post=False, timeout=None):
-    pattern = FORMAT_TO_URL_PATTERN_TABLE.get(output_format, output_format)
+def compile_code(base_url, uml_code, output_format, use_post=False, timeout=None):
+    """Compile PlantUML code into the specified format data by PlantUML server.
+
+    Args:
+        base_url (str): URL of PlantUML server.
+        uml_code (str): PlantUML code.
+        output_format (str): The target format.
+        use_post (bool): Whether or not to use HTTP POST method for compiling.
+            PlantUML server supports POST method from version 1.2018.5.
+        timeout (int): The server communication timeout in seconds.
+    Returns:
+        bytes: output data with the specified format.
+    """
+    pattern = _FORMAT_TO_URL_PATTERN_TABLE.get(output_format, output_format)
     if use_post:
         url = base_url + '/' + pattern + '/'
         data = uml_code.encode('utf-8')
@@ -460,6 +517,13 @@ def compile(base_url, uml_code, output_format, use_post=False, timeout=None):
 
 
 def format_to_ext(output_format):
+    """Get a file extension from the output_format
+
+    Args:
+        output_format (str):
+    Returns:
+        str: The corresponding file extension with '.ext' format.
+    """
     if output_format == 'txt':
         return '.atxt'
     if output_format == 'braille':
@@ -472,9 +536,10 @@ def format_to_ext(output_format):
 
 def _generate(base_url, timeout,
               filepath, output_format, outdir, output_filepath=None):
+    # pylint: disable=too-many-arguments
     uml_code = filepath.read_text()
     try:
-        reply = compile(base_url, uml_code, output_format, timeout)
+        reply = compile_code(base_url, uml_code, output_format, timeout)
         result = True
     except CompileError as error:
         logging.warning('%s: %s', filepath, error)
@@ -491,8 +556,8 @@ def _generate(base_url, timeout,
 def _check_syntax(base_url, timeout, filepath):
     uml_code = filepath.read_text()
     try:
-        reply = compile(
-                base_url, uml_code, 'check', use_post=False, timeout=timeout)
+        reply = compile_code(
+            base_url, uml_code, 'check', use_post=False, timeout=timeout)
         result = True
     except CompileError as error:
         logging.warning('%s: %s', filepath, error)
@@ -505,24 +570,24 @@ def _encodeurl(filepath):
     try:
         uml_code = filepath.read_text()
         print(filepath, ':', encode_code(uml_code))
-    except Exception as ex:
-        logging.error('Failed to encode %s: %s', encoded_uml, ex)
+    except Exception as ex: # pylint: disable=broad-except
+        logging.error('Failed to encode %s: %s', uml_code, ex)
         return False
     return True
 
 def _decodeurl(encoded_uml):
     try:
         print(decode_code(encoded_uml))
-    except Exception as ex:
+    except Exception as ex: # pylint: disable=broad-except
         logging.error('Failed to decode %s: %s', encoded_uml, ex)
         return False
     return True
 
 def _for_each_file(paths, proc, do_exit=False):
-    p = pathlib.Path('.')
+    base = pathlib.Path('.')
     result = True
     for path in paths:
-        pathlist = p.glob(path)
+        pathlist = base.glob(path)
         if not pathlist:
             logging.warning('%s is invalid path', path)
             continue
@@ -531,7 +596,7 @@ def _for_each_file(paths, proc, do_exit=False):
                 continue
             try:
                 result = proc(filepath) and result
-            except Exception as e:
+            except Exception: # pylint: disable=broad-except
                 logging.exception('%s: Failed to process', filepath)
                 result = False
     if do_exit:
@@ -559,14 +624,14 @@ def _run_with_pipe(base_url, timeout, args):
             else:
                 fmt = args.format
                 use_post = True
-            reply = compile(base_url, uml_code, fmt,
-                            use_post=use_post, timeout=timeout)
+            reply = compile_code(base_url, uml_code, fmt,
+                                 use_post=use_post, timeout=timeout)
             sys.stdout.buffer.write(reply)
         except CompileError as error:
             logging.warning('%s', error)
             sys.stdout.buffer.write(error.data)
             result = False
-        except Exception as e:
+        except Exception: # pylint: disable=broad-except
             logging.exception('Failed to compile')
             result = False
         if args.pipedelimitor is not None:
@@ -575,6 +640,11 @@ def _run_with_pipe(base_url, timeout, args):
 
 
 def main(args):
+    """Run action as plantuml command.
+
+    Args:
+        args: Parsing result from the parser created by `make_parser`.
+    """
     base_url = getattr(args, 'server_url', None) or DEFAULT_SERVER_URL
     timeout = getattr(args, 'server_timeout', None)
 
@@ -615,7 +685,5 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = make_parser()
-    args = parser.parse_args()
-    args.main_function(args)
-
+    ARGS = make_parser().parse_args()
+    ARGS.main_function(ARGS)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-
+"""This module provides functions to access RedPen server.
+"""
 import argparse
 import json
 import logging
@@ -16,10 +17,10 @@ except ImportError:
     from xml.etree import ElementTree as ET
 
 
-SERVER_HOST = '127.0.0.1'
-SERVER_PORT = 8080
-DEFAULT_SERVER_URL = 'http://%s:%d' % (SERVER_HOST, SERVER_PORT)
-PARSER_EXTENSIONS_LIST = [
+_SERVER_HOST = '127.0.0.1'
+_SERVER_PORT = 8080
+_DEFAULT_SERVER_URL = 'http://%s:%d' % (_SERVER_HOST, _SERVER_PORT)
+_PARSER_EXTENSIONS_LIST = [
         ('markdown', ['md', 'markdown']),
         ('plain', ['txt']),
         ('wiki', ['wiki']),
@@ -29,79 +30,92 @@ PARSER_EXTENSIONS_LIST = [
         ('review', ['re', 'review']),
         ('properties', ['properties']),
 ]
-FORMAT_LIST = ['json', 'json2', 'plain', 'plain2', 'xml']
-UNSUPPORTED_OPTIONS = ['lang', 'threshold']
+_FORMAT_LIST = ['json', 'json2', 'plain', 'plain2', 'xml']
+_UNSUPPORTED_OPTIONS = ['lang', 'threshold']
 
 
 def make_parser(parser_constructor=argparse.ArgumentParser):
+    """Make argparse parser object for RedPen server.
+    """
     parser = parser_constructor(
-            'redpen',
-            usage='%(prog)s [Options] [<INPUT FILE>]',
-            description='CLI for RedPen server',
-            add_help=False)
+        'redpen',
+        usage='%(prog)s [Options] [<INPUT FILE>]',
+        description='CLI for RedPen server',
+        add_help=False)
     parser.add_argument(
-            '--conf', '-c',
-            help='Configuration file',
-            action='store',
-            metavar='<CONF FILE>')
+        '--conf', '-c',
+        help='Configuration file',
+        action='store',
+        metavar='<CONF FILE>')
     parser.add_argument(
-            '--format', '-f',
-            help='Input file format (%(choices)s)',
-            action='store',
-            choices=[e[0] for e in PARSER_EXTENSIONS_LIST],
-            metavar='<FORMAT>',
-            dest='document_parser')
+        '--format', '-f',
+        help='Input file format (%(choices)s)',
+        action='store',
+        choices=[e[0] for e in _PARSER_EXTENSIONS_LIST],
+        metavar='<FORMAT>',
+        dest='document_parser')
     parser.add_argument(
-            '--help', '-h',
-            help='Displays this help information and exits',
-            action='help')
+        '--help', '-h',
+        help='Displays this help information and exits',
+        action='help')
     parser.add_argument(
-            '--limit', '-l',
-            help='Error limit number (default: %(default)d)',
-            action='store',
-            type=int,
-            metavar='<LIMIT NUMBER>',
-            default=1)
+        '--limit', '-l',
+        help='Error limit number (default: %(default)d)',
+        action='store',
+        type=int,
+        metavar='<LIMIT NUMBER>',
+        default=1)
     parser.add_argument(
-            '--lang', '-L',
-            help='Language of error messages (%(choices)s) (NOT SUPPORTED)',
-            action='store',
-            choices=['en', 'ja'],
-            metavar='<LANGUAGE>')
+        '--lang', '-L',
+        help='Language of error messages (%(choices)s) (NOT SUPPORTED)',
+        action='store',
+        choices=['en', 'ja'],
+        metavar='<LANGUAGE>')
     parser.add_argument(
-            '--result-format', '-r',
-            help='Output result format (%(choices)s) (default: %(default)s)',
-            action='store',
-            choices=FORMAT_LIST,
-            metavar='<RESULT FORMAT>',
-            dest='format',
-            default='plain')
+        '--result-format', '-r',
+        help='Output result format (%(choices)s) (default: %(default)s)',
+        action='store',
+        choices=_FORMAT_LIST,
+        metavar='<RESULT FORMAT>',
+        dest='format',
+        default='plain')
     parser.add_argument(
-            '--sentence', '-s',
-            help='Input sentences',
-            action='store',
-            metavar='<INPUT SENTENCES>',
-            dest='document')
+        '--sentence', '-s',
+        help='Input sentences',
+        action='store',
+        metavar='<INPUT SENTENCES>',
+        dest='document')
     parser.add_argument(
-            '--threshold', '-t',
-            help='Threshold of error level (info, warn, error) (NOT SUPPORTED)',
-            action='store',
-            choices=['info', 'warn', 'error'],
-            metavar='<THRESHOLD>')
+        '--threshold', '-t',
+        help='Threshold of error level (info, warn, error) (NOT SUPPORTED)',
+        action='store',
+        choices=['info', 'warn', 'error'],
+        metavar='<THRESHOLD>')
     parser.add_argument(
-            '--version', '-v',
-            action='store_true',
-            help='Displays version information and exits')
+        '--version', '-v',
+        action='store_true',
+        help='Displays version information and exits')
     parser.add_argument(
-            'input_file',
-            help='Input document',
-            nargs='?',
-            metavar='<INPUT FILE>')
+        'input_file',
+        help='Input document',
+        nargs='?',
+        metavar='<INPUT FILE>')
     parser.set_defaults(main_function=main)
     return parser
 
 
 def get_default_configfile():
+    """Get default RedPen XML configuration file.
+
+    Search current directory.
+    If no configurations are found, search the parent directories
+    until root directory.
+    If no configurations are found, search $REDPEN_HOME/conf/.
+
+    Returns:
+        pathlib.Path: The path to configuration file.
+            If not found, return None.
+    """
     def search_conf(dirpath):
         conf = dirpath / 'redpen-conf.xml'
         if conf.is_file():
@@ -124,34 +138,58 @@ def get_default_configfile():
 
 
 def get_document_parser_from_filename(filename):
+    """Get document format from the file extension.
+
+    Args:
+        filename: The filename of document.
+    Returns:
+        str: The format of the document.
+    """
     suffix = pathlib.Path(filename).suffix
     if not suffix:
         return None
-    for parser, extensions in PARSER_EXTENSIONS_LIST:
+    for parser, extensions in _PARSER_EXTENSIONS_LIST:
         if suffix[1:] in extensions:
             return parser
     return None
 
 
-def get_number_of_errors(result, format):
-    if format == 'json':
+def get_number_of_errors(result, output_format):
+    """Get the number of errors in validation result.
+
+    Args:
+        result (str): A validation result.
+        output_format (str): The format of the validation result.
+    Returns:
+        int: The number of errors in the validation result.
+    """
+    if output_format == 'json':
         result = json.loads(result)
         return len(result[0]['errors'])
-    if format == 'json2':
+    if output_format == 'json2':
         result = json.loads(result)
         return sum((len(error['errors']) for error in result[0]['errors']))
-    if format == 'plain':
+    if output_format == 'plain':
         return len(result.splitlines())
-    if format == 'plain2':
+    if output_format == 'plain2':
         errors = re.finditer(r'^\s+(?!(Line|Sentence):)(?=\w)',
                              result, flags=re.MULTILINE)
         return sum((1 for _ in errors))
-    if format == 'xml':
+    if output_format == 'xml':
         root = ET.fromstring(result)
         return len(root.findall('error'))
+    return 0 # Unknown format
 
 
 def get_version(base_url, timeout=None):
+    """Get RedPen version.
+
+    Args:
+        base_url (str): URL of RedPen server.
+        timeout (int): The server communication timeout in seconds.
+    Returns:
+        str: RedPen version.
+    """
     url = base_url + '/rest/config/redpens'
     with urllib.request.urlopen(url, timeout=timeout) as response:
         result = json.loads(response.read().decode('utf8'))
@@ -159,6 +197,15 @@ def get_version(base_url, timeout=None):
 
 
 def get_langauge(base_url, document, timeout=None):
+    """Get language of the document.
+
+    Args:
+        base_url (str): URL of RedPen server.
+        document (str): Document to get which language uses.
+        timeout (int): The server communication timeout in seconds.
+    Returns:
+        str: The language of the document.
+    """
     url = base_url + '/rest/document/language'
     data = {'document': document}
     data = urllib.parse.urlencode(data).encode('utf8')
@@ -167,13 +214,27 @@ def get_langauge(base_url, document, timeout=None):
         return result['key']
 
 
-def validate(base_url, document, document_parser, lang, format,
+def validate(base_url, document, document_parser, lang, output_format,
              config=None, timeout=None):
+    """Validate document.
+
+    Args:
+        base_url (str): URL of RedPen server.
+        document (str): Document to be validated.
+        document_parser (str): Document format.
+        lang (str): The language of document.
+        output_format (str): The format of the validation result.
+        config (str): The RedPen XML configuration.
+        timeout (int): The server communication timeout in seconds.
+    Returns:
+        str: The validation result with the specified format.
+    """
+    # pylint: disable=too-many-arguments
     data = {
         'document': document,
         'documentParser': document_parser,
         'lang': lang,
-        'format': format,
+        'format': output_format,
     }
     if config is not None:
         data['config'] = config
@@ -182,10 +243,9 @@ def validate(base_url, document, document_parser, lang, format,
     data = urllib.parse.urlencode(data).encode('utf8')
     with urllib.request.urlopen(url, data, timeout=timeout) as response:
         result = response.read().decode('utf8')
-        if format.startswith('json'):
+        if output_format.startswith('json'):
             return '[%s]' % result
-        else:
-            return result
+        return result
 
 
 def _exit_by_error(msg, *args, **kwargs):
@@ -227,7 +287,12 @@ def _get_document(args):
 
 
 def main(args):
-    base_url = getattr(args, 'server_url', None) or DEFAULT_SERVER_URL
+    """Run action as redpen command.
+
+    Args:
+        args: Parsing result from the parser created by `make_parser`.
+    """
+    base_url = getattr(args, 'server_url', None) or _DEFAULT_SERVER_URL
     timeout = getattr(args, 'server_timeout', None)
 
     if args.version:
@@ -235,9 +300,9 @@ def main(args):
         print(get_version(base_url, timeout=timeout))
         sys.exit(0)
 
-    for option in UNSUPPORTED_OPTIONS:
+    for option in _UNSUPPORTED_OPTIONS:
         if getattr(args, option) is not None:
-            logging.warning('Option "%s" is not supported' % option)
+            logging.warning('Option "%s" is not supported', option)
 
     logging.debug('Getting configuration file...')
     config = _get_config(args)
@@ -278,5 +343,5 @@ def main(args):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     logging.debug('Parsing command line options...')
-    args = make_parser().parse_args()
-    args.main_function(args)
+    ARGS = make_parser().parse_args()
+    ARGS.main_function(ARGS)

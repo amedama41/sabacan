@@ -64,7 +64,7 @@ class FlagAction(argparse.Action):
                                          help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        base_url = getattr(args, 'server_url', None) or DEFAULT_SERVER_URL
+        base_url = getattr(parser, 'server_url', None) or DEFAULT_SERVER_URL
         timeout = getattr(parser, 'server_timeout', None)
         code = '@startuml\n' + self.dest + '\n@enduml'
         try:
@@ -86,7 +86,7 @@ class LanguageAction(argparse.Action):
                 default, type, choices, required, help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        base_url = getattr(args, 'server_url', None) or DEFAULT_SERVER_URL
+        base_url = getattr(parser, 'server_url', None) or DEFAULT_SERVER_URL
         timeout = getattr(parser, 'server_timeout', None)
         url = base_url + '/language'
         try:

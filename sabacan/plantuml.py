@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 """This module provides functions to access PlantUML server.
+
+This module may use the following environment variables.
+
+:SABACAN_PLANTUML_URL:
+    URL of RedPen server. If SABACAN_PLANTUML_URL does not exist,
+    use SABACAN_URL instead.
+:SABACAN_PLANTUML_TIMEOUT:
+    Timeout (sec) of RedPen server communication. If SABACAN_PLANTUML_TIMEOUT
+    does not exist, use SABACAN_TIMEOUT instead.
 """
 import argparse
 import base64
@@ -9,6 +18,8 @@ import sys
 import urllib.error
 import urllib.request
 import zlib
+
+import sabacan.utils
 
 _FROM_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
 _TO_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_?'
@@ -85,8 +96,8 @@ class FlagAction(argparse.Action):
                                          help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        base_url = getattr(parser, 'server_url', None) or DEFAULT_SERVER_URL
-        timeout = getattr(parser, 'server_timeout', None)
+        base_url = sabacan.utils.get_server_url('plantuml', DEFAULT_SERVER_URL)
+        timeout = sabacan.utils.get_timeout('plantuml')
         code = '@startuml\n' + self.dest + '\n@enduml'
         try:
             result = compile_code(base_url, code, 'txt', timeout=timeout)
@@ -111,8 +122,8 @@ class LanguageAction(argparse.Action):
             default, type, choices, required, help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        base_url = getattr(parser, 'server_url', None) or DEFAULT_SERVER_URL
-        timeout = getattr(parser, 'server_timeout', None)
+        base_url = sabacan.utils.get_server_url('plantuml', DEFAULT_SERVER_URL)
+        timeout = sabacan.utils.get_timeout('plantuml')
         url = base_url + '/language'
         try:
             with urllib.request.urlopen(url, timeout=timeout) as response:
@@ -645,8 +656,8 @@ def main(args):
     Args:
         args: Parsing result from the parser created by `make_parser`.
     """
-    base_url = getattr(args, 'server_url', None) or DEFAULT_SERVER_URL
-    timeout = getattr(args, 'server_timeout', None)
+    base_url = sabacan.utils.get_server_url('plantuml', DEFAULT_SERVER_URL)
+    timeout = sabacan.utils.get_timeout('plantuml')
 
     if args.pipe:
         _run_with_pipe(base_url, timeout, args)

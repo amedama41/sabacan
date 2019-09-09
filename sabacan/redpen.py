@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 """This module provides functions to access RedPen server.
+
+This module may use the following environment variables.
+
+:SABACAN_REDPEN_URL:
+    URL of RedPen server. If SABACAN_REDPEN_URL does not exist,
+    use SABACAN_URL instead.
+:SABACAN_REDPEN_TIMEOUT:
+    Timeout (sec) of RedPen server communication. If SABACAN_REDPEN_TIMEOUT
+    does not exist, use SABACAN_TIMEOUT instead.
 """
 import argparse
 import json
@@ -15,6 +24,8 @@ try:
     from lxml import etree as ET
 except ImportError:
     from xml.etree import ElementTree as ET
+
+import sabacan.utils
 
 
 _SERVER_HOST = '127.0.0.1'
@@ -292,8 +303,8 @@ def main(args):
     Args:
         args: Parsing result from the parser created by `make_parser`.
     """
-    base_url = getattr(args, 'server_url', None) or _DEFAULT_SERVER_URL
-    timeout = getattr(args, 'server_timeout', None)
+    base_url = sabacan.utils.get_server_url('redpen', _DEFAULT_SERVER_URL)
+    timeout = sabacan.utils.get_timeout('redpen')
 
     if args.version:
         logging.debug('Getting RedPen version...')

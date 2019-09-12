@@ -48,7 +48,7 @@ _FORMAT_TO_URL_PATTERN_TABLE = {
 DEFAULT_SERVER_URL = 'http://%s:%d/plantuml' % ('127.0.0.1', 8080)
 
 
-class FlagAction(argparse.Action):
+class _FlagAction(argparse.Action):
     """Custom argparse.Action class to display variable information.
 
     This class compile dest as PlantUML code when the action is invoked.
@@ -58,7 +58,7 @@ class FlagAction(argparse.Action):
                  default=None, type=None, choices=None, required=False,
                  help=None, metavar=None):
         # pylint: disable=too-many-arguments,redefined-builtin
-        super(FlagAction, self).__init__(option_strings, dest, 0, const,
+        super(_FlagAction, self).__init__(option_strings, dest, 0, const,
                                          default, type, choices, required,
                                          help, metavar)
 
@@ -76,7 +76,7 @@ class FlagAction(argparse.Action):
         parser.exit(0)
 
 
-class LanguageAction(argparse.Action):
+class _LanguageAction(argparse.Action):
     """Custom argparse.Action class to display PlantUML language information.
     """
     # pylint: disable=too-few-public-methods
@@ -84,7 +84,7 @@ class LanguageAction(argparse.Action):
                  default=None, type=None, choices=None, required=False,
                  help=None, metavar=None):
         # pylint: disable=too-many-arguments,redefined-builtin
-        super(LanguageAction, self).__init__(
+        super(_LanguageAction, self).__init__(
             option_strings, dest, 0, const,
             default, type, choices, required, help, metavar)
 
@@ -198,15 +198,15 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
     parser.add_argument(
         '-version',
         help='To display information about PlantUML and Java versions',
-        action=FlagAction)
+        action=_FlagAction)
     parser.add_argument(
         '-license',
         help='To display license',
-        action=FlagAction)
+        action=_FlagAction)
     parser.add_argument(
         '-checkversion',
         help='To check if a newer version is available for download',
-        action=FlagAction)
+        action=_FlagAction)
     parser.add_argument(
         '-verbose', '-v',
         help='To have log information',
@@ -231,7 +231,7 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
     parser.add_argument(
         '-testdot',
         help='To test the installation of graphviz',
-        action=FlagAction)
+        action=_FlagAction)
     parser.add_argument(
         '-graphvizdot', '-graphviz_dot',
         help='To specify dot executable',
@@ -264,7 +264,7 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
     parser.add_argument(
         '-language',
         help='To print the list of PlantUML keywords',
-        action=LanguageAction)
+        action=_LanguageAction)
     # parser.add_argument(
     #     '-nosuggestengine',
     #     action='store_true',
@@ -305,7 +305,7 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
     parser.add_argument(
         '-about', '-authors', '-author',
         help='To print information about PlantUML authors',
-        action=FlagAction,
+        action=_FlagAction,
         dest='authors')
     parser.add_argument(
         '-overwrite',
@@ -314,7 +314,7 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
     parser.add_argument(
         '-printfonts',
         help='To print fonts available on your system',
-        action=FlagAction,
+        action=_FlagAction,
         dest='help font')
     parser.add_argument(
         '-enablestats',
@@ -385,7 +385,7 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
     parser.add_argument(
         '-stdlib',
         help='To print standard library info',
-        action=FlagAction)
+        action=_FlagAction)
     parser.add_argument(
         '-extractstdlib',
         help='To extract PlantUML Standard Library into stdlib folder',

@@ -91,10 +91,8 @@ class LanguageAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         base_url = sabacan.utils.get_server_url('plantuml', DEFAULT_SERVER_URL)
         timeout = sabacan.utils.get_timeout('plantuml')
-        url = base_url + '/language'
         try:
-            with urllib.request.urlopen(url, timeout=timeout) as response:
-                print(response.read().decode('utf8'))
+            print(get_language(base_url, timeout))
         except Exception as ex: # pylint: disable=broad-except
             logging.error('Failed to display language: %s', ex)
             parser.exit(1)
@@ -492,6 +490,20 @@ def compile_code(base_url, uml_code, output_format, use_post=False, timeout=None
                 content = error.read().decode('utf-8')
                 raise RuntimeError('%s: %s' % (error, content))
             raise CompileError(error.reason, error.read())
+
+
+def get_language(base_url, timeout=None):
+    """Get PlantUML languange information.
+
+    Args:
+        base_url (str): URL of PlantUML server.
+        timeout (int): The server communication timeout in seconds.
+    Returns:
+        str: PlantUML language information.
+    """
+    url = base_url + '/language'
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        return response.read().decode('utf8')
 
 
 def format_to_ext(output_format):

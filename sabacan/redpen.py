@@ -124,8 +124,8 @@ def get_default_configfile():
     If no configurations are found, search $REDPEN_HOME/conf/.
 
     Returns:
-        pathlib.Path: The path to configuration file.
-            If not found, return None.
+        pathlib.Path:
+            The path to configuration file. If not found, return None.
     """
     def search_conf(dirpath):
         conf = dirpath / 'redpen-conf.xml'

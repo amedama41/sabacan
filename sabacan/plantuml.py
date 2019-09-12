@@ -510,10 +510,10 @@ def get_language(base_url, timeout=None):
 
 
 def format_to_ext(output_format):
-    """Get a file extension from the output_format
+    """Get a file extension from the output format
 
     Args:
-        output_format (str):
+        output_format (str): The target format.
     Returns:
         str: The corresponding file extension with '.ext' format.
     """

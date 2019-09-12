@@ -470,6 +470,10 @@ def compile_code(base_url, uml_code, output_format, use_post=False, timeout=None
         timeout (int): The server communication timeout in seconds.
     Returns:
         bytes: output data with the specified format.
+    Raises:
+        CompileError: If PlantUML code can not be compiled.
+        urllib.error.HTTPError: If some server error occurs.
+        urllib.error.URLError: If some protocol error occurs.
     """
     pattern = _FORMAT_TO_URL_PATTERN_TABLE.get(output_format, output_format)
     if use_post:
@@ -487,8 +491,7 @@ def compile_code(base_url, uml_code, output_format, use_post=False, timeout=None
     except urllib.error.HTTPError as error:
         with error:
             if error.code != 400:
-                content = error.read().decode('utf-8')
-                raise RuntimeError('%s: %s' % (error, content))
+                raise
             raise CompileError(error.reason, error.read())
 
 

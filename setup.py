@@ -4,7 +4,7 @@ from setuptools import setup
 import sabacan
 
 BASEDIR = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(BASEDIR, 'README.md'), 'r') as f:
+with open(os.path.join(BASEDIR, 'README.rst'), 'r') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(
@@ -20,7 +20,7 @@ setup(
     entry_points={
         'console_scripts': ['sabacan = sabacan:main'],
     },
-    python_requires='>=3.7',
+    python_requires='>=3.5',
     classifiers=[
         'Environment :: Console',
         'License :: OSI Approved :: MIT License',

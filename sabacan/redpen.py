@@ -207,7 +207,7 @@ def get_version(base_url, timeout=None):
         return result['version']
 
 
-def get_langauge(base_url, document, timeout=None):
+def get_language(base_url, document, timeout=None):
     """Get language of the document.
 
     Args:
@@ -422,7 +422,7 @@ def main(args):
             lang = root.attrib.get('lang', 'en')
         else:
             logging.debug('Getting language from input document...')
-            lang = get_langauge(base_url, contents, timeout=timeout)
+            lang = get_language(base_url, contents, timeout=timeout)
 
         logging.debug('Validating input document '
                       '(document_parser=%s, lang=%s, format=%s)...',

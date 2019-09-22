@@ -107,9 +107,9 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
         action='store_true',
         help='Displays version information and exits')
     parser.add_argument(
-        'input_file',
+        'input_files',
         help='Input document',
-        nargs='?',
+        nargs='*',
         metavar='<INPUT FILE>')
     parser.set_defaults(main_function=main)
     return parser
@@ -276,25 +276,119 @@ def _get_config(args):
     return config_file.read_text()
 
 
-def _get_document_parser(args):
+def _get_document_parser(args, document):
     if args.document_parser is not None:
         return args.document_parser
-    if args.input_file is not None:
-        parser = get_document_parser_from_filename(args.input_file)
+    if document.filename is not None:
+        parser = get_document_parser_from_filename(document.filename)
         if parser is not None:
             return parser
     return 'plain'
 
 
-def _get_document(args):
+class _Document:
+    def __init__(self, document):
+        self._is_file = isinstance(document, pathlib.Path)
+        self._document = document
+
+    @property
+    def filename(self):
+        """Get filename"""
+        if self._is_file:
+            return self._document.name
+        return None
+
+    @property
+    def document(self):
+        """Get document"""
+        if self._is_file:
+            return self._document.read_text()
+        return self._document
+
+def _get_documents(args):
     if args.document is not None:
-        return args.document
-    if args.input_file is None:
+        return [_Document(args.document)]
+    if not args.input_files:
         _exit_by_error('Input is not given')
-    input_file = pathlib.Path(args.input_file)
-    if not input_file.is_file():
-        _exit_by_error('Input is not regular file')
-    return input_file.read_text()
+    docs = []
+    for input_file in args.input_files:
+        path = pathlib.Path(input_file)
+        if not path.is_file():
+            _exit_by_error('Input is not regular file')
+        docs.append(_Document(path))
+    return docs
+
+class _PlainMerger:
+    def __init__(self):
+        self._result = []
+
+    def __call__(self, name, result):
+        lines = result.splitlines()
+        if name is not None:
+            self._result.extend(name + ':' + line for line in lines)
+        else:
+            self._result.extend(lines)
+
+    def __str__(self):
+        return '\n'.join(self._result)
+
+class _Plain2Merger:
+    def __init__(self):
+        self._result = ''
+
+    def __call__(self, name, result):
+        if name is not None:
+            self._result += 'Document: ' + name + '\n'
+        self._result += result
+
+    def __str__(self):
+        return self._result
+
+class _JSONMerger:
+    def __init__(self):
+        self._result = []
+
+    def __call__(self, name, result):
+        json_result = json.loads(result)
+        if name is not None:
+            json_result[0]['document'] = name
+        self._result.append(json_result[0])
+
+    def __str__(self):
+        return json.dumps(self._result, ensure_ascii=False)
+
+class _XMLMerger:
+    def __init__(self):
+        self._result = ET.Element('validation-result')
+
+    def __call__(self, name, result):
+        root = ET.fromstring(result)
+        for error in root.iterfind('error'):
+            if name is not None:
+                file_elem = ET.Element('file')
+                file_elem.text = name
+                idx = len(error)
+                for idx, elem in enumerate(error):
+                    if elem.tag == 'lineNum':
+                        break
+                error.insert(idx, file_elem)
+            self._result.append(error)
+
+    def __str__(self):
+        return ET.tostring(self._result, encoding='utf8').decode('utf8')
+
+def _merge_result(results, output_format):
+    merger_map = {
+        'plain': _PlainMerger,
+        'plain2': _Plain2Merger,
+        'json': _JSONMerger,
+        'json2': _JSONMerger,
+        'xml': _XMLMerger,
+    }
+    merger = merger_map[output_format]()
+    for name, result in results:
+        merger(name, result)
+    return str(merger)
 
 
 def main(args):
@@ -313,33 +407,40 @@ def main(args):
 
     logging.debug('Getting configuration file...')
     config = _get_config(args)
-    logging.debug('Getting document...')
-    document = _get_document(args)
-    logging.debug('Getting document parser...')
-    document_parser = _get_document_parser(args)
-    if config is not None:
-        logging.debug('Getting language from configuration file...')
-        root = ET.fromstring(config)
-        lang = root.attrib.get('lang', 'en')
-    else:
-        logging.debug('Getting language from input document...')
-        lang = get_langauge(base_url, document, timeout=timeout)
+    logging.debug('Getting documents...')
+    documents = _get_documents(args)
+    output_format = args.format
+    results = []
+    num_error = 0
+    for doc in documents:
+        logging.debug('Getting document parser...')
+        document_parser = _get_document_parser(args, doc)
+        contents = doc.document
+        if config is not None:
+            logging.debug('Getting language from configuration file...')
+            root = ET.fromstring(config)
+            lang = root.attrib.get('lang', 'en')
+        else:
+            logging.debug('Getting language from input document...')
+            lang = get_langauge(base_url, contents, timeout=timeout)
 
-    logging.debug('Validating input document '
-                  '(document_parser=%s, lang=%s, format=%s)...',
-                  document_parser, lang, args.format)
-    try:
-        result = validate(base_url,
-                          document, document_parser, lang, args.format,
-                          config=config, timeout=timeout)
-    except urllib.error.HTTPError as error:
-        with error:
-            _exit_by_error('Failed to validate input document (%d %s): %s',
-                           error.code, error.reason, error.read())
-    print(result)
+        logging.debug('Validating input document '
+                      '(document_parser=%s, lang=%s, format=%s)...',
+                      document_parser, lang, output_format)
+        try:
+            result = validate(base_url,
+                              contents, document_parser, lang, output_format,
+                              config=config, timeout=timeout)
+        except urllib.error.HTTPError as error:
+            with error:
+                _exit_by_error('Failed to validate input document (%d %s): %s',
+                               error.code, error.reason, error.read())
+        results.append((doc.filename, result))
 
-    logging.debug('Calculating the number of errors...')
-    num_error = get_number_of_errors(result, args.format)
+        logging.debug('Calculating the number of errors...')
+        num_error += get_number_of_errors(result, output_format)
+
+    print(_merge_result(results, output_format))
     logging.debug('The number of errors is %d', num_error)
     if args.limit < num_error:
         _exit_by_error('The number of errors "%d" is larger'

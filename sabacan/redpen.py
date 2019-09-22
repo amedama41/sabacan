@@ -79,7 +79,7 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
     parser.add_argument(
         '--lang', '-L',
         help='Language of error messages (%(choices)s)',
-        action=NotSupportedAction,
+        action='store',
         choices=['en', 'ja'],
         metavar='<LANGUAGE>')
     parser.add_argument(
@@ -115,7 +115,7 @@ def make_parser(parser_constructor=argparse.ArgumentParser):
     return parser
 
 
-def get_default_configfile():
+def get_default_configfile(lang):
     """Get default RedPen XML configuration file.
 
     Search current directory.
@@ -123,17 +123,20 @@ def get_default_configfile():
     until root directory.
     If no configurations are found, search $REDPEN_HOME/conf/.
 
+    Args:
+        lang: The languange which searched configuration file name includes.
     Returns:
         pathlib.Path:
             The path to configuration file. If not found, return None.
     """
+    redpen_conf_lang_name = 'redpen-conf-' + lang + '.xml'
     def search_conf(dirpath):
         conf = dirpath / 'redpen-conf.xml'
         if conf.is_file():
             return conf
-        for conf in dirpath.glob('redpen-conf-*.xml'):
-            if conf.is_file():
-                return conf
+        conf = dirpath / redpen_conf_lang_name
+        if conf.is_file():
+            return conf
         return None
 
     current = pathlib.Path('.')
@@ -265,16 +268,19 @@ def _exit_by_error(msg, *args, **kwargs):
 
 
 def _get_config(args):
+    logging.debug('Getting configuration file...')
     if args.conf is None:
-        config_file = get_default_configfile()
-    else:
-        config_file = pathlib.Path(args.conf)
-    if config_file is None:
         return None
+    config_file = pathlib.Path(args.conf)
     if not config_file.is_file():
         _exit_by_error('%s is not file', config_file)
     return config_file.read_text()
 
+def _get_lang_from_config(config):
+    logging.debug('Getting language from configuration file...')
+    root = ET.fromstring(config)
+    lang = root.attrib.get('lang', 'en')
+    return lang
 
 def _get_document_parser(args, document):
     if args.document_parser is not None:
@@ -284,6 +290,20 @@ def _get_document_parser(args, document):
         if parser is not None:
             return parser
     return 'plain'
+
+def _get_default_config(lang, config_cache):
+    if lang in config_cache:
+        return config_cache[lang]
+    logging.debug('Getting %s configuration file...', lang)
+    config_file = get_default_configfile(lang)
+    if config_file is None:
+        logging.debug('Not found %s configuration file...', lang)
+        config = None
+    else:
+        logging.debug('Found configuration file: %s', config_file)
+        config = config_file.read_text()
+    config_cache[lang] = config
+    return config
 
 
 class _Document:
@@ -306,6 +326,7 @@ class _Document:
         return self._document
 
 def _get_documents(args):
+    logging.debug('Getting documents...')
     if args.document is not None:
         return [_Document(args.document)]
     if not args.input_files:
@@ -405,31 +426,32 @@ def main(args):
         print(get_version(base_url, timeout=timeout))
         sys.exit(0)
 
-    logging.debug('Getting configuration file...')
-    config = _get_config(args)
-    logging.debug('Getting documents...')
-    documents = _get_documents(args)
-    output_format = args.format
+    global_config = _get_config(args)
+    if global_config is not None:
+        lang = _get_lang_from_config(global_config)
+    config_cache = {}
     results = []
     num_error = 0
-    for doc in documents:
+    for doc in _get_documents(args):
         logging.debug('Getting document parser...')
         document_parser = _get_document_parser(args, doc)
         contents = doc.document
-        if config is not None:
-            logging.debug('Getting language from configuration file...')
-            root = ET.fromstring(config)
-            lang = root.attrib.get('lang', 'en')
+        if global_config is None:
+            if args.lang is None:
+                logging.debug('Getting language from input document...')
+                lang = get_language(base_url, contents, timeout=timeout)
+            else:
+                lang = args.lang
+            config = _get_default_config(lang, config_cache)
         else:
-            logging.debug('Getting language from input document...')
-            lang = get_language(base_url, contents, timeout=timeout)
+            config = global_config
 
         logging.debug('Validating input document '
                       '(document_parser=%s, lang=%s, format=%s)...',
-                      document_parser, lang, output_format)
+                      document_parser, lang, args.format)
         try:
             result = validate(base_url,
-                              contents, document_parser, lang, output_format,
+                              contents, document_parser, lang, args.format,
                               config=config, timeout=timeout)
         except urllib.error.HTTPError as error:
             with error:
@@ -438,9 +460,9 @@ def main(args):
         results.append((doc.filename, result))
 
         logging.debug('Calculating the number of errors...')
-        num_error += get_number_of_errors(result, output_format)
+        num_error += get_number_of_errors(result, args.format)
 
-    print(_merge_result(results, output_format))
+    print(_merge_result(results, args.format))
     logging.debug('The number of errors is %d', num_error)
     if args.limit < num_error:
         _exit_by_error('The number of errors "%d" is larger'

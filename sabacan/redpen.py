@@ -274,7 +274,7 @@ def _get_config(args):
     config_file = pathlib.Path(args.conf)
     if not config_file.is_file():
         _exit_by_error('%s is not file', config_file)
-    return config_file.read_text()
+    return config_file.read_text(encoding='utf8')
 
 def _get_lang_from_config(config):
     logging.debug('Getting language from configuration file...')
@@ -301,7 +301,7 @@ def _get_default_config(lang, config_cache):
         config = None
     else:
         logging.debug('Found configuration file: %s', config_file)
-        config = config_file.read_text()
+        config = config_file.read_text(encoding='utf8')
     config_cache[lang] = config
     return config
 
@@ -322,7 +322,7 @@ class _Document:
     def document(self):
         """Get document"""
         if self._is_file:
-            return self._document.read_text()
+            return self._document.read_text(encoding='utf8')
         return self._document
 
 def _get_documents(args):

@@ -13,6 +13,7 @@ This module may use the following environment variables.
 import argparse
 import base64
 import glob
+import io
 import logging
 import os
 import pathlib
@@ -530,7 +531,7 @@ def format_to_ext(output_format):
 def _generate(base_url, timeout,
               filepath, output_format, outdir, output_filepath=None):
     # pylint: disable=too-many-arguments
-    uml_code = filepath.read_text()
+    uml_code = filepath.read_text(encoding='utf-8')
     try:
         reply = compile_code(base_url, uml_code, output_format, timeout)
         result = True
@@ -547,7 +548,7 @@ def _generate(base_url, timeout,
     return result
 
 def _check_syntax(base_url, timeout, filepath):
-    uml_code = filepath.read_text()
+    uml_code = filepath.read_text(encoding='utf-8')
     try:
         reply = compile_code(
             base_url, uml_code, 'check', use_post=False, timeout=timeout)
@@ -561,7 +562,7 @@ def _check_syntax(base_url, timeout, filepath):
 
 def _encodeurl(filepath):
     try:
-        uml_code = filepath.read_text()
+        uml_code = filepath.read_text(encoding='utf-8')
         print(filepath, ':', encode_code(uml_code))
     except Exception as ex: # pylint: disable=broad-except
         logging.error('Failed to encode %s: %s', uml_code, ex)
@@ -598,9 +599,9 @@ def _for_each_file(paths, proc, do_exit=False):
         sys.exit(0 if result else 1)
     return result
 
-def _read_uml_code():
+def _read_uml_code(stdin):
     code_lines = []
-    for line in sys.stdin:
+    for line in stdin:
         code_lines.append(line)
         if line.startswith('@end'):
             return '\n'.join(code_lines)
@@ -608,8 +609,9 @@ def _read_uml_code():
 
 def _run_with_pipe(base_url, timeout, args):
     result = True
+    stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
     while True:
-        uml_code = _read_uml_code()
+        uml_code = _read_uml_code(stdin)
         if not uml_code:
             break
         try:

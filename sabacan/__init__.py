@@ -52,4 +52,7 @@ def main():
     sabacan.redpen.make_parser(subparsers.add_parser)
 
     args = parser.parse_args()
-    args.main_function(args)
+    if hasattr(args, 'main_function'):
+        args.main_function(args)
+    else:
+        parser.print_help()

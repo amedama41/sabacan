@@ -10,7 +10,7 @@ This module may use the following environment variables.
 import argparse
 import sabacan.plantuml
 import sabacan.redpen
-from sabacan.utils import SetEnvAction
+from sabacan.utils import SetEnvAction, SetFlagEnvAction
 
 
 __version__ = '0.0.1'
@@ -37,6 +37,12 @@ def main():
         type=int,
         action=SetEnvAction,
         dest='SABACAN_TIMEOUT')
+    parser.add_argument(
+        '--insecure',
+        help='Allow connections to SSL sites without certs',
+        action=SetFlagEnvAction,
+        dest='_SABACAN_INSECURE',
+        default='0')
 
     subparsers = parser.add_subparsers(
         title='supported subcommand',

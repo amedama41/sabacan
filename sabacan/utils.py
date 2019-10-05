@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+import ssl
 
 
 class SetEnvAction(argparse.Action): # pylint: disable=too-few-public-methods
@@ -10,6 +11,44 @@ class SetEnvAction(argparse.Action): # pylint: disable=too-few-public-methods
     """
     def __call__(self, parser, namespace, values, option_string=None):
         os.environ[self.dest] = values
+
+class SetFlagEnvAction(argparse.Action):
+    """Custom argparse.Action which set flag environment variable.
+    """
+    # pylint: disable=too-few-public-methods
+    def __init__(self, option_strings, dest, nargs=None, const=None,
+                 default=None, type=None, choices=None, required=False,
+                 help=None, metavar=None):
+        # pylint: disable=too-many-arguments,redefined-builtin
+        super(SetFlagEnvAction, self).__init__(
+            option_strings, dest, 0, const,
+            default, type, choices, required, help, metavar)
+        if self.default is not None:
+            os.environ[self.dest] = default
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        os.environ[self.dest] = '1'
+
+
+def get_connection_info(servername, default_url=None, default_timeout=None):
+    """Get URL, timeout, and SSL context.
+
+    Args:
+        servername (str): The name of application (e.g. plantuml)
+        default_url (str): The result when URL done not exist
+            in environment variables.
+        default_timeout (int): The result when timeout does not exist
+            in environment variables.
+    Returns:
+        (str, dict): URL of server, and a dictionary including
+            timeout, and SSL context.
+    """
+    url = get_server_url(servername, default_url)
+    options = {
+        'timeout': get_timeout(servername, default_timeout),
+        'ssl_context': get_context(),
+    }
+    return (url, options)
 
 def get_server_url(servername, default=None):
     """Get URL for server from environment variables.
@@ -44,6 +83,18 @@ def get_timeout(servername, default=None):
             return int(timeout)
         except ValueError:
             pass
+    return None
+
+def get_context():
+    """Get SSL context for server communication from environment variables.
+
+    Returns:
+        ssl.SSLContext: The SSL context of server communication.
+    """
+    insecure = os.getenv('_SABACAN_INSECURE')
+    if insecure is not None and insecure != '0':
+        # pylint: disable=protected-access
+        return ssl._create_unverified_context()
     return None
 
 

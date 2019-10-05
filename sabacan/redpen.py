@@ -195,41 +195,45 @@ def get_number_of_errors(result, output_format):
     return 0 # Unknown format
 
 
-def get_version(base_url, timeout=None):
+def get_version(base_url, timeout=None, ssl_context=None):
     """Get RedPen version.
 
     Args:
         base_url (str): URL of RedPen server.
         timeout (int): The server communication timeout in seconds.
+        ssl_context (ssl.SSLContext): SSL Context for server communication.
     Returns:
         str: RedPen version.
     """
     url = base_url + '/rest/config/redpens'
-    with urllib.request.urlopen(url, timeout=timeout) as response:
+    with urllib.request.urlopen(
+            url, timeout=timeout, context=ssl_context) as response:
         result = json.loads(response.read().decode('utf8'))
         return result['version']
 
 
-def get_language(base_url, document, timeout=None):
+def get_language(base_url, document, timeout=None, ssl_context=None):
     """Get language of the document.
 
     Args:
         base_url (str): URL of RedPen server.
         document (str): Document to get which language uses.
         timeout (int): The server communication timeout in seconds.
+        ssl_context (ssl.SSLContext): SSL Context for server communication.
     Returns:
         str: The language of the document.
     """
     url = base_url + '/rest/document/language'
     data = {'document': document}
     data = urllib.parse.urlencode(data).encode('utf8')
-    with urllib.request.urlopen(url, data, timeout=timeout) as response:
+    with urllib.request.urlopen(
+            url, data, timeout=timeout, context=ssl_context) as response:
         result = json.loads(response.read().decode('utf8'))
         return result['key']
 
 
 def validate(base_url, document, document_parser, lang, output_format,
-             config=None, timeout=None):
+             config=None, timeout=None, ssl_context=None):
     """Validate document.
 
     Args:
@@ -240,6 +244,7 @@ def validate(base_url, document, document_parser, lang, output_format,
         output_format (str): The format of the validation result.
         config (str): The RedPen XML configuration.
         timeout (int): The server communication timeout in seconds.
+        ssl_context (ssl.SSLContext): SSL Context for server communication.
     Returns:
         str: The validation result with the specified format.
     """
@@ -255,7 +260,8 @@ def validate(base_url, document, document_parser, lang, output_format,
 
     url = base_url + '/rest/document/validate'
     data = urllib.parse.urlencode(data).encode('utf8')
-    with urllib.request.urlopen(url, data, timeout=timeout) as response:
+    with urllib.request.urlopen(
+            url, data, timeout=timeout, context=ssl_context) as response:
         result = response.read().decode('utf8')
         if output_format.startswith('json'):
             return '[%s]' % result
@@ -418,12 +424,12 @@ def main(args):
     Args:
         args: Parsing result from the parser created by `make_parser`.
     """
-    base_url = sabacan.utils.get_server_url('redpen', _DEFAULT_SERVER_URL)
-    timeout = sabacan.utils.get_timeout('redpen')
+    base_url, options = sabacan.utils.get_connection_info(
+        'redpen', default_url=_DEFAULT_SERVER_URL)
 
     if args.version:
         logging.debug('Getting RedPen version...')
-        print(get_version(base_url, timeout=timeout))
+        print(get_version(base_url, **options))
         sys.exit(0)
 
     global_config = _get_config(args)
@@ -439,7 +445,7 @@ def main(args):
         if global_config is None:
             if args.lang is None:
                 logging.debug('Getting language from input document...')
-                lang = get_language(base_url, contents, timeout=timeout)
+                lang = get_language(base_url, contents, **options)
             else:
                 lang = args.lang
             config = _get_default_config(lang, config_cache)
@@ -452,7 +458,7 @@ def main(args):
         try:
             result = validate(base_url,
                               contents, document_parser, lang, args.format,
-                              config=config, timeout=timeout)
+                              config=config, **options)
         except urllib.error.HTTPError as error:
             with error:
                 _exit_by_error('Failed to validate input document (%d %s): %s',

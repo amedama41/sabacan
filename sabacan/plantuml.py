@@ -64,11 +64,11 @@ class _FlagAction(argparse.Action):
                                           help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        base_url = sabacan.utils.get_server_url('plantuml', DEFAULT_SERVER_URL)
-        timeout = sabacan.utils.get_timeout('plantuml')
+        base_url, options = sabacan.utils.get_connection_info(
+            'plantuml', default_url=DEFAULT_SERVER_URL)
         code = '@startuml\n' + self.dest + '\n@enduml'
         try:
-            result = compile_code(base_url, code, 'txt', timeout=timeout)
+            result = compile_code(base_url, code, 'txt', **options)
             lines = result.decode('utf-8').splitlines()
             print('\n'.join(line.strip() for line in lines))
         except Exception as ex: # pylint: disable=broad-except
@@ -90,10 +90,10 @@ class _LanguageAction(argparse.Action):
             default, type, choices, required, help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        base_url = sabacan.utils.get_server_url('plantuml', DEFAULT_SERVER_URL)
-        timeout = sabacan.utils.get_timeout('plantuml')
+        base_url, options = sabacan.utils.get_connection_info(
+            'plantuml', default_url=DEFAULT_SERVER_URL)
         try:
-            print(get_language(base_url, timeout))
+            print(get_language(base_url, **options))
         except Exception as ex: # pylint: disable=broad-except
             logging.error('Failed to display language: %s', ex)
             parser.exit(1)
@@ -459,7 +459,9 @@ def decode_code(encoded_uml):
     return byte_code.decode('utf-8')
 
 
-def compile_code(base_url, uml_code, output_format, use_post=False, timeout=None):
+def compile_code(base_url, uml_code, output_format, use_post=False,
+                 timeout=None, ssl_context=None):
+    # pylint: disable=too-many-arguments
     """Compile PlantUML code into the specified format data by PlantUML server.
 
     Args:
@@ -469,6 +471,7 @@ def compile_code(base_url, uml_code, output_format, use_post=False, timeout=None
         use_post (bool): Whether or not to use HTTP POST method for compiling.
             PlantUML server supports POST method from version 1.2018.5.
         timeout (int): The server communication timeout in seconds.
+        ssl_context (ssl.SSLContext): SSL Context for server communication.
     Returns:
         bytes: output data with the specified format.
     Raises:
@@ -487,7 +490,8 @@ def compile_code(base_url, uml_code, output_format, use_post=False, timeout=None
         url = base_url + '/' + pattern + '/' + encoded_uml
         request = urllib.request.Request(url)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(
+                request, timeout=timeout, context=ssl_context) as response:
             return response.read()
     except urllib.error.HTTPError as error:
         with error:
@@ -496,17 +500,19 @@ def compile_code(base_url, uml_code, output_format, use_post=False, timeout=None
             raise CompileError(error.reason, error.read())
 
 
-def get_language(base_url, timeout=None):
+def get_language(base_url, timeout=None, ssl_context=None):
     """Get PlantUML languange information.
 
     Args:
         base_url (str): URL of PlantUML server.
         timeout (int): The server communication timeout in seconds.
+        ssl_context (ssl.SSLContext): SSL Context for server communication.
     Returns:
         str: PlantUML language information.
     """
     url = base_url + '/language'
-    with urllib.request.urlopen(url, timeout=timeout) as response:
+    with urllib.request.urlopen(
+            url, timeout=timeout, context=ssl_context) as response:
         return response.read().decode('utf8')
 
 
@@ -528,12 +534,12 @@ def format_to_ext(output_format):
     return '.' + output_format
 
 
-def _generate(base_url, timeout,
+def _generate(base_url, options,
               filepath, output_format, outdir, output_filepath=None):
     # pylint: disable=too-many-arguments
     uml_code = filepath.read_text(encoding='utf-8')
     try:
-        reply = compile_code(base_url, uml_code, output_format, timeout)
+        reply = compile_code(base_url, uml_code, output_format, **options)
         result = True
     except CompileError as error:
         logging.warning('%s: %s', filepath, error)
@@ -547,11 +553,11 @@ def _generate(base_url, timeout,
     output_filepath.write_bytes(reply)
     return result
 
-def _check_syntax(base_url, timeout, filepath):
+def _check_syntax(base_url, options, filepath):
     uml_code = filepath.read_text(encoding='utf-8')
     try:
         reply = compile_code(
-            base_url, uml_code, 'check', use_post=False, timeout=timeout)
+            base_url, uml_code, 'check', use_post=False, **options)
         result = True
     except CompileError as error:
         logging.warning('%s: %s', filepath, error)
@@ -607,7 +613,7 @@ def _read_uml_code(stdin):
             return '\n'.join(code_lines)
     return '\n'.join(code_lines)
 
-def _run_with_pipe(base_url, timeout, args):
+def _run_with_pipe(base_url, options, args):
     result = True
     stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
     while True:
@@ -622,7 +628,7 @@ def _run_with_pipe(base_url, timeout, args):
                 fmt = args.format
                 use_post = True
             reply = compile_code(base_url, uml_code, fmt,
-                                 use_post=use_post, timeout=timeout)
+                                 use_post=use_post, **options)
             sys.stdout.buffer.write(reply)
         except CompileError as error:
             logging.warning('%s', error)
@@ -642,11 +648,11 @@ def main(args):
     Args:
         args: Parsing result from the parser created by `make_parser`.
     """
-    base_url = sabacan.utils.get_server_url('plantuml', DEFAULT_SERVER_URL)
-    timeout = sabacan.utils.get_timeout('plantuml')
+    base_url, options = sabacan.utils.get_connection_info(
+        'plantuml', default_url=DEFAULT_SERVER_URL)
 
     if args.pipe:
-        _run_with_pipe(base_url, timeout, args)
+        _run_with_pipe(base_url, options, args)
 
     input_paths = getattr(args, 'file/dir')
     if args.computeurl:
@@ -659,7 +665,7 @@ def main(args):
     if args.syntax:
         _for_each_file(
             input_paths,
-            lambda path: _check_syntax(base_url, timeout, path),
+            lambda path: _check_syntax(base_url, options, path),
             do_exit=True)
 
     if args.outfile is not None:
@@ -677,7 +683,7 @@ def main(args):
     _for_each_file(
         input_paths,
         lambda path: _generate(
-            base_url, timeout, path, args.format, outdir, outfile),
+            base_url, options, path, args.format, outdir, outfile),
         do_exit=True)
 
 

@@ -59,8 +59,8 @@ class _FlagAction(argparse.Action):
                  help=None, metavar=None):
         # pylint: disable=too-many-arguments,redefined-builtin
         super(_FlagAction, self).__init__(option_strings, dest, 0, const,
-                                         default, type, choices, required,
-                                         help, metavar)
+                                          default, type, choices, required,
+                                          help, metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
         base_url = sabacan.utils.get_server_url('plantuml', DEFAULT_SERVER_URL)

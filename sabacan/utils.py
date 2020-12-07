@@ -10,7 +10,7 @@ class SetEnvAction(argparse.Action): # pylint: disable=too-few-public-methods
     """Custom argparse.Action which set environment variable.
     """
     def __call__(self, parser, namespace, values, option_string=None):
-        os.environ[self.dest] = values
+        os.environ[self.dest] = str(values)
 
 class SetFlagEnvAction(argparse.Action):
     """Custom argparse.Action which set flag environment variable.

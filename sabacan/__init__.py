@@ -13,7 +13,7 @@ import sabacan.redpen
 from sabacan.utils import SetEnvAction, SetFlagEnvAction
 
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
 
 def main():

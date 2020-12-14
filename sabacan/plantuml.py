@@ -439,7 +439,7 @@ def encode_code(uml_code, level=-1):
         str: The PlantUML Text Encoding text.
     """
     byte_code = uml_code.encode('utf-8')
-    compressed_code = zlib.compress(byte_code, level)
+    compressed_code = zlib.compress(byte_code, level)[2:-4]
     base64_code = base64.b64encode(compressed_code).decode('ascii')
     return ''.join(_ENCODE_TABLE[c] for c in base64_code)
 

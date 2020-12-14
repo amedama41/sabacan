@@ -460,7 +460,7 @@ def decode_code(encoded_uml):
 
 
 def compile_code(base_url, uml_code, output_format, use_post=False,
-                 timeout=None, ssl_context=None):
+                 timeout=None, user_agent=None, ssl_context=None):
     # pylint: disable=too-many-arguments
     """Compile PlantUML code into the specified format data by PlantUML server.
 
@@ -479,16 +479,17 @@ def compile_code(base_url, uml_code, output_format, use_post=False,
         urllib.error.HTTPError: If some server error occurs.
         urllib.error.URLError: If some protocol error occurs.
     """
+    headers = sabacan.utils.make_headers(user_agent)
     pattern = _FORMAT_TO_URL_PATTERN_TABLE.get(output_format, output_format)
     if use_post:
         url = base_url + '/' + pattern + '/'
         data = uml_code.encode('utf-8')
-        headers = {'Content-Type': 'text/plain;charset="UTF-8"'}
+        headers['Content-Type'] = 'text/plain;charset="UTF-8"'
         request = urllib.request.Request(url, data, headers)
     else:
         encoded_uml = encode_code(uml_code)
         url = base_url + '/' + pattern + '/' + encoded_uml
-        request = urllib.request.Request(url)
+        request = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(
                 request, timeout=timeout, context=ssl_context) as response:
@@ -500,7 +501,7 @@ def compile_code(base_url, uml_code, output_format, use_post=False,
             raise CompileError(error.reason, error.read())
 
 
-def get_language(base_url, timeout=None, ssl_context=None):
+def get_language(base_url, timeout=None, user_agent=None, ssl_context=None):
     """Get PlantUML languange information.
 
     Args:
@@ -511,8 +512,10 @@ def get_language(base_url, timeout=None, ssl_context=None):
         str: PlantUML language information.
     """
     url = base_url + '/language'
+    headers = sabacan.utils.make_headers(user_agent)
+    request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(
-            url, timeout=timeout, context=ssl_context) as response:
+            request, timeout=timeout, context=ssl_context) as response:
         return response.read().decode('utf8')
 
 

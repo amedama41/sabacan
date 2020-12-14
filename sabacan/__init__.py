@@ -38,6 +38,12 @@ def main():
         action=SetEnvAction,
         dest='SABACAN_TIMEOUT')
     parser.add_argument(
+        '--user-agent',
+        help='User-Agent for server communication',
+        metavar='UserAgent',
+        action=SetEnvAction,
+        dest='SABACAN_USER_AGENT')
+    parser.add_argument(
         '--insecure',
         help='Allow connections to SSL sites without certs',
         action=SetFlagEnvAction,

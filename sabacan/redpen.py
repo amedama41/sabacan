@@ -195,7 +195,7 @@ def get_number_of_errors(result, output_format):
     return 0 # Unknown format
 
 
-def get_version(base_url, timeout=None, ssl_context=None):
+def get_version(base_url, timeout=None, user_agent=None, ssl_context=None):
     """Get RedPen version.
 
     Args:
@@ -206,8 +206,10 @@ def get_version(base_url, timeout=None, ssl_context=None):
         str: RedPen version.
     """
     url = base_url + '/rest/config/redpens'
+    headers = sabacan.utils.make_headers(user_agent)
+    request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(
-            url, timeout=timeout, context=ssl_context) as response:
+            request, timeout=timeout, context=ssl_context) as response:
         result = json.loads(response.read().decode('utf8'))
         return result['version']
 
@@ -226,14 +228,16 @@ def get_language(base_url, document, timeout=None, ssl_context=None):
     url = base_url + '/rest/document/language'
     data = {'document': document}
     data = urllib.parse.urlencode(data).encode('utf8')
+    headers = sabacan.utils.make_headers(user_agent)
+    request = urllib.request.Request(url, data, headers)
     with urllib.request.urlopen(
-            url, data, timeout=timeout, context=ssl_context) as response:
+            request, timeout=timeout, context=ssl_context) as response:
         result = json.loads(response.read().decode('utf8'))
         return result['key']
 
 
 def validate(base_url, document, document_parser, lang, output_format,
-             config=None, timeout=None, ssl_context=None):
+             config=None, timeout=None, user_agent=None, ssl_context=None):
     """Validate document.
 
     Args:
@@ -260,8 +264,10 @@ def validate(base_url, document, document_parser, lang, output_format,
 
     url = base_url + '/rest/document/validate'
     data = urllib.parse.urlencode(data).encode('utf8')
+    headers = sabacan.utils.make_headers(user_agent)
+    request = urllib.request.Request(url, data, headers)
     with urllib.request.urlopen(
-            url, data, timeout=timeout, context=ssl_context) as response:
+            request, timeout=timeout, context=ssl_context) as response:
         result = response.read().decode('utf8')
         if output_format.startswith('json'):
             return '[%s]' % result

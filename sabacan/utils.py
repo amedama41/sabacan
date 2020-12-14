@@ -41,11 +41,12 @@ def get_connection_info(servername, default_url=None, default_timeout=None):
             in environment variables.
     Returns:
         (str, dict): URL of server, and a dictionary including
-            timeout, and SSL context.
+            timeout, user-agent and SSL context.
     """
     url = get_server_url(servername, default_url)
     options = {
         'timeout': get_timeout(servername, default_timeout),
+        'user_agent': get_user_agent(servername),
         'ssl_context': get_context(),
     }
     return (url, options)
@@ -85,6 +86,21 @@ def get_timeout(servername, default=None):
             pass
     return None
 
+def get_user_agent(servername, default=None):
+    """Get User-Agent for server communication from environment variables.
+
+    Args:
+        servername (str): The name of application (e.g. plantuml)
+        default (int): The result when User-Agent does not exist
+            in environment variables.
+    Returns:
+        str: User-Agent of server communication.
+    """
+    user_agent = os.getenv('SABACAN_%s_USER_AGENT' % servername.upper())
+    if user_agent is not None:
+        return user_agent
+    return os.getenv('SABACAN_USER_AGENT', default)
+
 def get_context():
     """Get SSL context for server communication from environment variables.
 
@@ -96,6 +112,20 @@ def get_context():
         # pylint: disable=protected-access
         return ssl._create_unverified_context()
     return None
+
+
+def make_headers(user_agent):
+    """Make HTTP headers from arguments.
+
+    Args:
+        user_agent (str): User-Agent of servername communication
+    Returns:
+        dict: HTTP headers
+    """
+    headers = {}
+    if user_agent is not None:
+        headers['User-Agent'] = user_agent
+    return headers
 
 
 class NotSupportedAction(argparse.Action):
